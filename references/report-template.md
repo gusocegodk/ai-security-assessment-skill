@@ -18,13 +18,39 @@ Use this template for generating `ai-security-assessment-report.md`.
 
 **Overall Risk Level:** [Critical/High/Medium/Low]
 
-| Severity | Count |
-|----------|-------|
-| Critical | X |
-| High | X |
-| Medium | X |
-| Low | X |
-| **Total** | **X** |
+### Risk Score: [X/100]
+
+Calculate based on: `100 - (Critical × 25) - (High × 10) - (Medium × 3) - (Low × 1)`, clamped to 0-100.
+
+| Score Range | Rating | Meaning |
+|-------------|--------|---------|
+| 90-100 | Excellent | Minimal risk, strong security posture |
+| 70-89 | Good | Minor issues, generally well-secured |
+| 40-69 | Moderate | Notable vulnerabilities requiring attention |
+| 20-39 | Poor | Significant vulnerabilities, high risk |
+| 0-19 | Critical | Severe vulnerabilities, immediate action required |
+
+### Findings Summary
+
+| Severity | Count | Status |
+|----------|-------|--------|
+| Critical | X | ⬜ Requires immediate action |
+| High | X | ⬜ Fix within days |
+| Medium | X | ⬜ Fix within sprint |
+| Low | X | ⬜ Address in backlog |
+| **Total** | **X** | |
+
+### Security Baseline Status
+
+| Control | Present | Note |
+|---------|---------|------|
+| Input validation | Yes/No | [Library or concern] |
+| Rate limiting (auth) | Yes/No | [Details] |
+| Security headers (CSP, HSTS) | Yes/No | [Details] |
+| Dependency scanning | Yes/No | [CI/CD integration] |
+| Error handling | Yes/No | [Global handler?] |
+| Secret management | Yes/No | [Env vars / Vault?] |
+| Logging & monitoring | Yes/No | [Framework?] |
 
 [2-3 sentence summary of key findings and overall security posture]
 
@@ -167,16 +193,24 @@ This assessment followed OWASP Top 10 (2021), CWE Top 25, and SANS Top 25 standa
 |----------|-----|------------|
 | SQL Injection | CWE-89 | A03:2021 |
 | Command Injection | CWE-78 | A03:2021 |
+| Code Injection (eval/exec) | CWE-94 | A03:2021 |
+| Template Injection (SSTI) | CWE-1336 | A03:2021 |
 | XSS | CWE-79 | A03:2021 |
 | Path Traversal | CWE-22 | A01:2021 |
 | Broken Auth | CWE-287 | A07:2021 |
+| OAuth/OIDC Flaws | CWE-287 | A07:2021 |
 | IDOR | CWE-639 | A01:2021 |
 | CSRF | CWE-352 | A01:2021 |
 | Security Misconfig | CWE-16 | A05:2021 |
+| Container Misconfig | CWE-16 | A05:2021 |
 | Sensitive Data Exposure | CWE-200 | A02:2021 |
 | Weak Crypto | CWE-327 | A02:2021 |
 | SSRF | CWE-918 | A10:2021 |
 | XXE | CWE-611 | A05:2021 |
+| Open Redirect | CWE-601 | A01:2021 |
+| Insecure Deserialization | CWE-502 | A08:2021 |
+| GraphQL Security | CWE-284 | A01:2021 |
 | Race Condition | CWE-362 | A04:2021 |
 | DoS/ReDoS | CWE-400 | A05:2021 |
 | Vulnerable Dependencies | CWE-1104 | A06:2021 |
+| Missing Security Controls | CWE-693 | A05:2021 |

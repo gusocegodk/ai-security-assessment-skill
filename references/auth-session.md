@@ -185,3 +185,88 @@ const secret = process.env.JWT_SECRET; // Should be 256+ bits of entropy
 - [ ] Reasonable expiration (exp claim)
 - [ ] Token validated server-side
 - [ ] Sensitive data not in payload (or encrypted)
+
+## OAuth / OIDC Security
+
+### Detection Patterns
+
+```bash
+# OAuth libraries and configuration
+grep -rn "oauth\|OAuth\|passport\|OAuthLib\|authlib\|omniauth\|spring-security-oauth\|oidc\|openid" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.java" --include="*.go"
+
+# Redirect URI configuration
+grep -rn "redirect_uri\|callback_url\|callbackURL\|redirect_url\|OAUTH.*REDIRECT\|authorization_url" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.java" --include="*.env"
+
+# State parameter handling
+grep -rn "state\s*=\|state=\|csrf.*state\|anti_forgery\|state_token" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb" --include="*.java" | grep -i "oauth\|auth\|callback"
+
+# Token storage
+grep -rn "access_token\|refresh_token\|id_token" --include="*.py" --include="*.js" --include="*.ts" | grep -i "localStorage\|sessionStorage\|cookie\|store\|save\|set"
+```
+
+### Vulnerable Patterns
+
+```python
+# VULNERABLE: No state parameter (CSRF on OAuth flow)
+@app.route('/login/github')
+def github_login():
+    return redirect(f"https://github.com/login/oauth/authorize?"
+                    f"client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}")
+    # Missing state parameter!
+
+# SECURE: State parameter with verification
+@app.route('/login/github')
+def github_login():
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    return redirect(f"https://github.com/login/oauth/authorize?"
+                    f"client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}&state={state}")
+
+@app.route('/callback')
+def callback():
+    if request.args.get('state') != session.pop('oauth_state', None):
+        abort(403)  # CSRF protection
+    # ... exchange code for token
+```
+
+```javascript
+// VULNERABLE: Token stored in localStorage (XSS accessible)
+localStorage.setItem('access_token', response.data.token);
+
+// VULNERABLE: Client secret exposed in frontend
+const clientSecret = 'abc123';  // Never do this
+
+// SECURE: Token in httpOnly cookie, secret on server only
+res.cookie('token', accessToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: 'Lax'
+});
+```
+
+```javascript
+// VULNERABLE: Open redirect_uri allows token theft
+app.get('/callback', (req, res) => {
+    // Accepts any redirect_uri from the request
+    const redirectUri = req.query.redirect_uri;
+});
+
+// SECURE: Validate redirect_uri against registered values
+const REGISTERED_URIS = ['https://app.example.com/callback'];
+if (!REGISTERED_URIS.includes(redirectUri)) {
+    return res.status(400).json({ error: 'Invalid redirect_uri' });
+}
+```
+
+### OAuth/OIDC Checklist
+
+- [ ] State parameter used and validated (CSRF protection)
+- [ ] Redirect URIs strictly validated against registered list
+- [ ] Client secret stored server-side only (never in frontend)
+- [ ] PKCE used for public clients (SPAs, mobile apps)
+- [ ] Access tokens not stored in localStorage (use httpOnly cookies)
+- [ ] Token exchange happens server-side (authorization code flow)
+- [ ] Refresh tokens rotated on use
+- [ ] Scopes follow principle of least privilege
+- [ ] ID token signature verified
+- [ ] Token expiration enforced

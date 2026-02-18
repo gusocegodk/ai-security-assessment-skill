@@ -166,6 +166,165 @@ grep -rn "static\|serve_static\|express\.static\|sendFile" --include="*.py" --in
 grep -rn "Options.*Indexes\|autoindex\s*on" --include="*.conf" --include=".htaccess"
 ```
 
+## Container Security (Docker)
+
+### Detection Patterns
+
+```bash
+# Dockerfile security issues
+grep -rn "FROM.*latest\|FROM.*:latest" --include="Dockerfile*"
+
+# Running as root
+grep -rn "USER\s" --include="Dockerfile*"
+
+# Secrets in build args or env
+grep -rn "ARG.*password\|ARG.*secret\|ARG.*key\|ARG.*token\|ENV.*password\|ENV.*secret\|ENV.*key\|ENV.*token" --include="Dockerfile*" --include="docker-compose*.yml" --include="docker-compose*.yaml"
+
+# Privileged mode in docker-compose
+grep -rn "privileged:\s*true\|cap_add\|security_opt.*no-new-privileges" --include="docker-compose*.yml" --include="docker-compose*.yaml"
+
+# Exposed ports
+grep -rn "EXPOSE\|ports:" --include="Dockerfile*" --include="docker-compose*.yml"
+```
+
+### Vulnerable Patterns
+
+```dockerfile
+# VULNERABLE: Running as root (default)
+FROM node:latest
+COPY . /app
+RUN npm install
+CMD ["node", "app.js"]
+
+# SECURE: Non-root user, pinned version, multi-stage
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+FROM node:20-alpine
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+WORKDIR /app
+COPY --from=builder /app/node_modules ./node_modules
+COPY . .
+CMD ["node", "app.js"]
+```
+
+### Docker Security Checklist
+
+- [ ] Base image uses specific version tag (not `latest`)
+- [ ] Non-root USER specified
+- [ ] No secrets in ENV or ARG instructions
+- [ ] Multi-stage build used (minimal final image)
+- [ ] No privileged mode in docker-compose
+- [ ] Health check defined
+- [ ] Read-only filesystem where possible
+
+## Kubernetes Security
+
+### Detection Patterns
+
+```bash
+# K8s manifests
+grep -rn "securityContext\|runAsNonRoot\|readOnlyRootFilesystem\|allowPrivilegeEscalation\|capabilities" --include="*.yml" --include="*.yaml" | grep -v node_modules
+
+# Privileged containers
+grep -rn "privileged:\s*true" --include="*.yml" --include="*.yaml"
+
+# Missing resource limits
+grep -rn "resources:\|limits:\|requests:" --include="*.yml" --include="*.yaml" | grep -v node_modules
+
+# Secrets in plain text manifests
+grep -rn "kind:\s*Secret" --include="*.yml" --include="*.yaml" -A 10 | grep "stringData\|data:"
+
+# Host network/PID/IPC
+grep -rn "hostNetwork:\s*true\|hostPID:\s*true\|hostIPC:\s*true" --include="*.yml" --include="*.yaml"
+```
+
+### Vulnerable Patterns
+
+```yaml
+# VULNERABLE: Overly permissive pod spec
+apiVersion: v1
+kind: Pod
+spec:
+  containers:
+  - name: app
+    image: app:latest
+    securityContext:
+      privileged: true          # Full host access
+      runAsUser: 0              # Running as root
+    # No resource limits = DoS risk
+
+# SECURE: Hardened pod spec
+apiVersion: v1
+kind: Pod
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+  containers:
+  - name: app
+    image: app:1.2.3
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
+    resources:
+      limits:
+        memory: "128Mi"
+        cpu: "500m"
+```
+
+## Infrastructure as Code (Terraform)
+
+### Detection Patterns
+
+```bash
+# Public access misconfigurations
+grep -rn "publicly_accessible\s*=\s*true\|acl\s*=\s*\"public" --include="*.tf"
+
+# Security groups with open ingress
+grep -rn 'cidr_blocks.*"0\.0\.0\.0/0"\|cidr_blocks.*"::/0"' --include="*.tf"
+
+# Unencrypted storage
+grep -rn "encrypted\s*=\s*false\|storage_encrypted\s*=\s*false" --include="*.tf"
+
+# Missing logging
+grep -rn "logging\|access_logs\|enable_logging" --include="*.tf"
+
+# Hardcoded credentials in Terraform
+grep -rn "password\s*=\s*\"\|secret_key\s*=\s*\"\|access_key\s*=\s*\"" --include="*.tf" --include="*.tfvars"
+```
+
+### Vulnerable Patterns
+
+```hcl
+# VULNERABLE: Public S3 bucket
+resource "aws_s3_bucket" "data" {
+  bucket = "my-data-bucket"
+  acl    = "public-read"  # Publicly accessible
+}
+
+# VULNERABLE: Open security group
+resource "aws_security_group_rule" "ssh" {
+  type        = "ingress"
+  from_port   = 22
+  to_port     = 22
+  cidr_blocks = ["0.0.0.0/0"]  # SSH open to world
+}
+
+# SECURE: Restricted access
+resource "aws_security_group_rule" "ssh" {
+  type        = "ingress"
+  from_port   = 22
+  to_port     = 22
+  cidr_blocks = ["10.0.0.0/8"]  # Internal only
+}
+```
+
 ## Configuration Checklist
 
 - [ ] Debug mode disabled in production
@@ -178,3 +337,9 @@ grep -rn "Options.*Indexes\|autoindex\s*on" --include="*.conf" --include=".htacc
 - [ ] Unnecessary features disabled
 - [ ] TLS 1.2+ enforced
 - [ ] HTTP methods restricted (no TRACE)
+- [ ] Docker containers run as non-root
+- [ ] Docker images use pinned versions
+- [ ] No secrets in Dockerfiles or docker-compose
+- [ ] Kubernetes pods have security contexts
+- [ ] Terraform resources not publicly accessible
+- [ ] Security groups restrict ingress appropriately

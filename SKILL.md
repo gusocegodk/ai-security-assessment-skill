@@ -11,7 +11,7 @@ description: >
 
   Supports all major languages: JavaScript/TypeScript/Node.js, Python, Java, Go, Ruby, PHP, C#, etc.
 metadata:
-  version: "1.0.2"
+  version: "2.0.0"
 ---
 
 # Security Assessment Skill
@@ -22,7 +22,7 @@ Conduct thorough security assessments of codebases, generating detailed vulnerab
 
 1. **Scope determination** - Identify target path and languages
 2. **Discovery** - Enumerate files and detect technology stack
-3. **Analysis** - Scan all 13 security domains (see references/)
+3. **Analysis** - Scan all 18 security domains (see references/)
 4. **Reporting** - Generate `ai-security-assessment-report.md`
 
 ## Quick Start
@@ -57,19 +57,34 @@ Analyze each security domain using patterns in `references/`. For each domain:
 4. Document findings with file:line references
 
 **Security Domains** (load relevant reference as needed):
-- `references/injection.md` - SQL, Command, Path Traversal, NoSQL, LDAP, XPath
+
+*Injection & Input Handling:*
+- `references/injection.md` - SQL, Command, Path Traversal, NoSQL, LDAP, XPath, Code Injection (eval/exec)
 - `references/xss.md` - DOM-based, Reflected, Stored XSS
-- `references/auth-session.md` - Authentication, password handling, session management
+- `references/ssti.md` - Server-Side Template Injection (Jinja2, ERB, Velocity, FreeMarker, Twig, Pug)
+- `references/xxe.md` - XML external entity injection
+- `references/deserialization.md` - Insecure deserialization (Pickle, ObjectInputStream, unserialize, Marshal)
+
+*Authentication & Access:*
+- `references/auth-session.md` - Authentication, password handling, session management, OAuth/OIDC
 - `references/access-control.md` - Authorization, IDOR, privilege escalation
 - `references/csrf.md` - CSRF tokens, SameSite cookies
-- `references/config.md` - Security misconfiguration, debug mode, CORS, headers
-- `references/data-exposure.md` - Hardcoded secrets, sensitive data logging, PII
+- `references/open-redirect.md` - URL redirection, login flow redirect validation
+
+*Configuration & Infrastructure:*
+- `references/config.md` - Security misconfiguration, debug mode, CORS, headers, Docker, Kubernetes, Terraform
+- `references/data-exposure.md` - Hardcoded secrets, sensitive data logging, PII, .env exposure, git history
 - `references/crypto.md` - Weak algorithms, key management, randomness
+
+*Application Logic:*
 - `references/ssrf.md` - Server-side request forgery
-- `references/xxe.md` - XML external entity injection
-- `references/race-conditions.md` - TOCTOU, business logic flaws
+- `references/graphql.md` - Introspection, authorization, query complexity, batching abuse
+- `references/race-conditions.md` - TOCTOU, async race conditions, database locking, Go concurrency
 - `references/dos.md` - Rate limiting, ReDoS, resource exhaustion
 - `references/dependencies.md` - Outdated packages, known CVEs
+
+*Security Baseline:*
+- `references/positive-security.md` - Missing security controls (headers, rate limiting, validation, logging, error handling)
 
 ### Step 3: Generate Report
 
@@ -90,6 +105,7 @@ Save report to: `ai-security-assessment-report.md` in the project root or specif
 
 ## Notes
 
-- For faster scans focusing only on critical issues, suggest the `/security-quick-scan` skill
 - Large codebases may take several minutes
 - Findings should be validated manually before remediation
+- The report includes a risk score (0-100) and security baseline status table
+- Positive security checks flag missing controls (not just vulnerable code)

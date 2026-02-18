@@ -4,7 +4,7 @@ Comprehensive AI-powered security audit skill for [Claude Code](https://docs.ant
 
 ## Overview
 
-This skill performs automated security assessments of codebases, scanning 13 security domains and generating detailed reports with remediation guidance. It follows **OWASP Top 10 (2021)**, **CWE Top 25**, and **SANS Top 25** standards.
+This skill performs automated security assessments of codebases, scanning 18 security domains and generating detailed reports with remediation guidance. It follows **OWASP Top 10 (2021)**, **CWE Top 25**, and **SANS Top 25** standards.
 
 ## Supported Languages
 
@@ -14,19 +14,24 @@ JavaScript/TypeScript, Python, Java, Go, Ruby, PHP, C#, and more.
 
 | Domain | Examples |
 |---|---|
-| Injection | SQL, Command, Path Traversal, NoSQL, LDAP |
+| Injection | SQL, Command, Path Traversal, NoSQL, LDAP, Code Injection (eval/exec) |
 | XSS | DOM-based, Reflected, Stored |
-| Authentication & Session | Password handling, session management |
+| Template Injection (SSTI) | Jinja2, ERB, Velocity, FreeMarker, Twig, Pug, EJS |
+| Deserialization | Pickle, ObjectInputStream, unserialize, Marshal, node-serialize |
+| Authentication & Session | Password handling, session management, OAuth/OIDC |
 | Access Control | Authorization, IDOR, privilege escalation |
 | CSRF | Token validation, SameSite cookies |
-| Configuration | Debug mode, CORS, security headers |
-| Data Exposure | Hardcoded secrets, PII leakage, sensitive logging |
+| Open Redirect | URL redirection, login flow redirects, bypass techniques |
+| Configuration | Debug mode, CORS, security headers, Docker, Kubernetes, Terraform |
+| Data Exposure | Hardcoded secrets, PII leakage, .env files, git history |
 | Cryptography | Weak algorithms, key management, randomness |
 | SSRF | Server-side request forgery |
 | XXE | XML external entity injection |
-| Race Conditions | TOCTOU, business logic flaws |
+| GraphQL | Introspection, authorization, query complexity, batching |
+| Race Conditions | TOCTOU, async/await, database locking, Go concurrency |
 | DoS | Rate limiting, ReDoS, resource exhaustion |
 | Dependencies | Outdated packages, known CVEs |
+| Positive Security | Missing controls: CSP, rate limiting, input validation, logging |
 
 ## Usage
 
@@ -46,7 +51,7 @@ Or ask naturally:
 
 1. **Scope** - Identifies target path and languages
 2. **Discovery** - Enumerates files and detects technology stack
-3. **Analysis** - Scans all 13 security domains using reference patterns
+3. **Analysis** - Scans all 18 security domains using reference patterns
 4. **Report** - Generates `ai-security-assessment-report.md` with categorized findings
 
 ## Severity Levels
@@ -60,10 +65,13 @@ Or ask naturally:
 
 Generates a structured markdown report including:
 
+- Risk score (0-100) with rating
+- Security baseline status table (missing controls)
 - Executive summary with severity breakdown
 - Technology stack detection
 - Categorized findings with CWE/OWASP mappings
 - Remediation guidance for each finding
+- Compliance considerations (GDPR, PCI-DSS, SOC 2)
 
 ## Installation
 

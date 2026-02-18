@@ -118,6 +118,50 @@ const username = String(req.body.username);
 const password = String(req.body.password);
 ```
 
+## Code Injection (eval / exec)
+
+### Detection Patterns
+
+```bash
+# Python: eval/exec with user input
+grep -rn "eval\s*(\|exec\s*(\|compile\s*(" --include="*.py"
+
+# JavaScript: eval, Function constructor, setTimeout/setInterval with strings
+grep -rn "eval\s*(\|new\s*Function\s*(\|setTimeout\s*(\s*['\"\`]\|setInterval\s*(\s*['\"\`]" --include="*.js" --include="*.ts"
+
+# Ruby: eval, send, public_send with user input
+grep -rn "eval\s*(\|instance_eval\|class_eval\|send\s*(\|public_send\s*(" --include="*.rb"
+
+# PHP: eval, assert, preg_replace with /e
+grep -rn "eval\s*(\|assert\s*(\|preg_replace.*\/e\|create_function" --include="*.php"
+```
+
+### Vulnerable Patterns
+
+```python
+# VULNERABLE: eval with user input
+result = eval(request.args.get('expr'))  # RCE
+
+# VULNERABLE: exec with user input
+exec(request.form.get('code'))
+
+# SECURE: Use ast.literal_eval for safe data parsing
+import ast
+result = ast.literal_eval(user_input)  # Only parses literals
+```
+
+```javascript
+// VULNERABLE: eval with user input
+const result = eval(req.query.expression);
+
+// VULNERABLE: Function constructor
+const fn = new Function('return ' + userInput)();
+
+// SECURE: Use a safe expression parser
+const mathjs = require('mathjs');
+const result = mathjs.evaluate(userInput);
+```
+
 ## LDAP/XPath Injection
 
 ### Detection Patterns
@@ -129,3 +173,16 @@ grep -rn "ldap_search\|LdapConnection\|DirectorySearcher" --include="*.py" --inc
 # XPath queries
 grep -rn "xpath\|selectNodes\|evaluate" --include="*.py" --include="*.java" --include="*.js"
 ```
+
+## Template Injection
+
+See `references/ssti.md` for comprehensive Server-Side Template Injection patterns (Jinja2, ERB, Velocity, FreeMarker, Twig, Pug, EJS).
+
+## Injection Checklist
+
+- [ ] No string concatenation/interpolation in SQL queries
+- [ ] No shell=True with user input in subprocess calls
+- [ ] File paths validated against base directory (realpath check)
+- [ ] No eval/exec/Function with user-controlled input
+- [ ] NoSQL queries type-check input (no operator injection)
+- [ ] Template rendering uses files with variables, not user-constructed strings

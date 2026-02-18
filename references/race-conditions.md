@@ -113,12 +113,131 @@ def check_rate_limit(user_id):
 7. **Voting/polling systems** - Duplicate vote prevention
 8. **Auction/bidding** - Bid validation
 
+## Async / Promise Race Conditions (JavaScript)
+
+### Detection Patterns
+
+```bash
+# Shared state modified in async functions
+grep -rn "async\s*function\|async\s*(" --include="*.js" --include="*.ts" | grep -c ""
+
+# Await gaps with shared state
+grep -rn "await.*\n.*await" --include="*.js" --include="*.ts"
+
+# Promise.all with dependent operations
+grep -rn "Promise\.all\|Promise\.allSettled" --include="*.js" --include="*.ts"
+```
+
+### Vulnerable Patterns
+
+```javascript
+// VULNERABLE: Shared state between awaits
+let balance = await getBalance(userId);
+// Race window: another request can read same balance here
+if (balance >= amount) {
+    await deductBalance(userId, amount);  // Double-spend possible
+}
+
+// VULNERABLE: Non-atomic read-modify-write
+app.post('/like', async (req, res) => {
+    const post = await Post.findById(req.body.postId);
+    post.likes += 1;  // Race: two requests read same value
+    await post.save();
+});
+
+// SECURE: Atomic database operation
+app.post('/like', async (req, res) => {
+    await Post.findByIdAndUpdate(req.body.postId, { $inc: { likes: 1 } });
+});
+```
+
+## Database Locking Patterns
+
+### Detection Patterns
+
+```bash
+# SELECT FOR UPDATE (pessimistic locking)
+grep -rn "FOR UPDATE\|for_update\|with_for_update\|NOWAIT\|SKIP LOCKED" --include="*.py" --include="*.js" --include="*.ts" --include="*.java" --include="*.rb" --include="*.sql"
+
+# Optimistic locking (version columns)
+grep -rn "version\|optimistic_lock\|@Version\|lock_version\|OptimisticLocking\|StaleObjectError\|OptimisticLockException" --include="*.py" --include="*.js" --include="*.ts" --include="*.java" --include="*.rb"
+```
+
+### Vulnerable Patterns
+
+```sql
+-- VULNERABLE: No locking on balance check
+SELECT balance FROM accounts WHERE id = 123;
+-- Another transaction can read same balance here
+UPDATE accounts SET balance = balance - 100 WHERE id = 123;
+
+-- SECURE: SELECT FOR UPDATE
+BEGIN;
+SELECT balance FROM accounts WHERE id = 123 FOR UPDATE;
+-- Row is locked, other transactions wait
+UPDATE accounts SET balance = balance - 100 WHERE id = 123;
+COMMIT;
+```
+
+```python
+# VULNERABLE: Django/SQLAlchemy without locking
+account = Account.objects.get(id=account_id)
+if account.balance >= amount:
+    account.balance -= amount
+    account.save()
+
+# SECURE: select_for_update
+with transaction.atomic():
+    account = Account.objects.select_for_update().get(id=account_id)
+    if account.balance >= amount:
+        account.balance -= amount
+        account.save()
+```
+
+## Go Concurrency Race Conditions
+
+### Detection Patterns
+
+```bash
+# Goroutines accessing shared state
+grep -rn "go func\|go \w" --include="*.go"
+
+# Missing mutex/lock around shared data
+grep -rn "sync\.Mutex\|sync\.RWMutex\|sync\.Map\|atomic\." --include="*.go"
+
+# Channel operations (check for proper usage)
+grep -rn "make(chan\|<-\s*chan\|chan\s*<-" --include="*.go"
+```
+
+### Vulnerable Patterns
+
+```go
+// VULNERABLE: Shared map without synchronization
+var cache = make(map[string]string)  // Concurrent map read/write = panic
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    go func() {
+        cache[r.URL.Path] = result  // Race condition
+    }()
+}
+
+// SECURE: Use sync.Map or mutex
+var cache sync.Map
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    cache.Store(r.URL.Path, result)
+}
+```
+
 ## Race Condition Checklist
 
-- [ ] Financial operations use database transactions
-- [ ] Row-level locking for balance/inventory updates
+- [ ] Financial operations use database transactions with row locking
+- [ ] SELECT FOR UPDATE used for check-then-update patterns
 - [ ] Atomic operations for counters (INCR, not GET+SET)
 - [ ] Unique constraints prevent duplicate entries
 - [ ] No TOCTOU in file operations
 - [ ] Idempotency keys for payment operations
 - [ ] Optimistic locking with version numbers where appropriate
+- [ ] Async/await code doesn't have shared state between await points
+- [ ] Go goroutines use sync primitives for shared data
+- [ ] Promise.all not used for dependent/sequential operations

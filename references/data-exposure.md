@@ -148,12 +148,80 @@ find . -name ".idea" -o -name ".vscode" -o -name "*.swp"
 ls -la .git
 ```
 
+## .env File Exposure
+
+### Detection Patterns
+
+```bash
+# .env files committed to repo
+find . -name ".env" -o -name ".env.local" -o -name ".env.production" -o -name ".env.staging" | grep -v node_modules | grep -v .git
+
+# Check if .env is in .gitignore
+grep -n "\.env" .gitignore
+
+# .env referenced but potentially missing from .gitignore
+grep -rn "dotenv\|load_dotenv\|config()\|from_envvar" --include="*.py" --include="*.js" --include="*.ts" --include="*.rb"
+```
+
+### What to Flag
+
+- `.env` files present in repo without `.gitignore` entry
+- `.env.example` containing real values instead of placeholders
+- Multiple `.env.*` variants that may contain production secrets
+
+## Secrets in Comments and Documentation
+
+### Detection Patterns
+
+```bash
+# Secrets in code comments
+grep -rn "TODO.*password\|FIXME.*secret\|HACK.*key\|#.*api_key.*=\|//.*password.*=" --include="*.py" --include="*.js" --include="*.ts" --include="*.java" --include="*.rb" --include="*.go"
+
+# Secrets in markdown/docs
+grep -rn "password\|secret\|api.key\|token" --include="*.md" | grep -v "CHANGEME\|<.*>\|example\|placeholder\|your_"
+```
+
+## Git History Secret Scanning
+
+### Detection Guidance
+
+When assessing a repo, note if secrets scanning has been done on git history:
+
+```bash
+# Check for git-secrets, trufflehog, or gitleaks in CI
+grep -rn "git-secrets\|trufflehog\|gitleaks\|detect-secrets\|whispers" --include="*.yml" --include="*.yaml" --include="*.json" --include="Makefile" --include="Dockerfile"
+
+# Check pre-commit hooks for secret scanning
+cat .pre-commit-config.yaml 2>/dev/null | grep -i "secret\|trufflehog\|gitleaks"
+```
+
+Flag as **Medium** finding if:
+- No secret scanning tool configured in CI/CD pipeline
+- No pre-commit hook for secret detection
+- Hardcoded secrets found in current code (likely also in history)
+
+## High-Entropy String Hints
+
+When reviewing code manually, look for these high-entropy patterns that automated grep may miss:
+
+| Pattern | Likely Secret |
+|---------|--------------|
+| 40-char hex string | SHA1 hash, API token |
+| 64-char hex string | SHA256 hash, secret key |
+| 32+ char alphanumeric | API key, random token |
+| Base64 string > 40 chars in config | Encrypted key, certificate |
+| String starting with `ey` in config | JWT token (base64 encoded JSON) |
+
 ## Data Protection Checklist
 
 - [ ] No hardcoded secrets in code
-- [ ] .gitignore includes sensitive files
+- [ ] No secrets in comments or documentation
+- [ ] .gitignore includes .env and sensitive files
 - [ ] Environment variables for secrets
 - [ ] Secrets management system (Vault, AWS Secrets Manager)
+- [ ] Git history scanned for leaked secrets
+- [ ] Secret scanning in CI/CD pipeline
+- [ ] Pre-commit hooks for secret detection
 - [ ] PII encrypted at rest
 - [ ] PII masked in logs
 - [ ] No PII in URLs
